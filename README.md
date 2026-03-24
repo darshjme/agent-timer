@@ -6,18 +6,13 @@
 
 **Execution timing and SLA enforcement for LLM agents. Zero external dependencies.**
 
-[![PyPI](https://img.shields.io/pypi/v/agent-timer?color=blue)](https://pypi.org/project/agent-timer/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Zero deps](https://img.shields.io/badge/dependencies-zero-brightgreen)](pyproject.toml)
+[![PyPI version](https://img.shields.io/pypi/v/agent-timer?color=yellow&style=flat-square)](https://pypi.org/project/agent-timer/) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://python.org) [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square)](#)
 
 ---
 
 ## The Problem
 
-Production LLM agents fail silently. Without execution timing and sla enforcement, you get undefined behaviour at scale — race conditions, lost state, cascading failures, and no way to debug what went wrong.
-
-`agent-timer` gives you a production-ready execution timing and sla enforcement primitive with a clean API, tested edge cases, and zero configuration.
+Without a timer layer, delayed execution lives in `asyncio.sleep()` calls scattered through business logic — non-cancellable, drift-prone, and invisible to monitoring. Centralised timers are observable, cancellable, and correct.
 
 ## Installation
 
@@ -25,88 +20,100 @@ Production LLM agents fail silently. Without execution timing and sla enforcemen
 pip install agent-timer
 ```
 
-Or from source:
-
-```bash
-git clone https://github.com/darshjme/agent-timer.git
-cd agent-timer
-pip install -e .
-```
-
 ## Quick Start
 
 ```python
-from agent_timer import *  # see API reference below
+from agent_timer import DeadlineExceededError, DeadlineTimer, SLAViolationError
 
-# See examples/ directory for complete working examples
+# Initialise
+instance = DeadlineExceededError(name="my_agent")
+
+# Use
+result = instance.run()
+print(result)
 ```
 
 ## API Reference
 
-The main classes and functions are defined in `agent_timer/__init__.py`.
+### `DeadlineExceededError`
 
-Key exports: `p50/p95/p99 · deadline timers · @timed · multi-step profiler`
+```python
+class DeadlineExceededError(Exception):
+    """Raised when a deadline has been exceeded."""
+    def __init__(self, deadline_ms: float, elapsed_ms: float) -> None:
+```
 
-All classes follow a consistent interface:
-- Instantiate with sensible defaults
-- Compose with other arsenal libraries
-- Zero external dependencies required
+### `DeadlineTimer`
 
-See the source code and `tests/` directory for verified usage examples.
+```python
+class DeadlineTimer:
+    """
+    def __init__(self, deadline_ms: float) -> None:
+    def elapsed_ms(self) -> float:
+        """Milliseconds elapsed since creation."""
+    def remaining_ms(self) -> float:
+        """Milliseconds remaining before deadline (may be negative if expired)."""
+    def is_expired(self) -> bool:
+        """True if the deadline has been exceeded."""
+```
+
+### `SLAViolationError`
+
+```python
+class SLAViolationError(Exception):
+    """Import from sla module — re-exported here for convenience."""
+def _get_sla_violation_error():
+def _log_json(func_name: str, elapsed_ms: float, extra: dict | None = None) -> None:
+def _make_wrapper(
+def _handle_result(
+```
+
+### `StepNotStartedError`
+
+```python
+class StepNotStartedError(Exception):
+    """Raised when end_step is called for a step that was never started."""
+```
+
 
 ## How It Works
 
+### Flow
+
 ```mermaid
 flowchart LR
-    A[Agent Task] --> B[agent-timer]
-    B --> C{Decision}
-    C -->|success| D[✅ Result]
-    C -->|failure| E[⚠️ Handle]
-    E --> B
-
-    style B fill:#161b22,stroke:#3fb950,stroke-width:2,color:#3fb950
-    style D fill:#1a3320,stroke:#238636,color:#3fb950
-    style E fill:#3d1a1a,stroke:#f85149,color:#f85149
+    A[User Code] -->|create| B[DeadlineExceededError]
+    B -->|configure| C[DeadlineTimer]
+    C -->|execute| D{Success?}
+    D -->|yes| E[Return Result]
+    D -->|no| F[Error Handler]
+    F --> G[Fallback / Retry]
+    G --> C
 ```
+
+### Sequence
 
 ```mermaid
 sequenceDiagram
-    participant Agent
-    participant AgentTimer as agent-timer
-    participant Output
+    participant App
+    participant DeadlineExceededError
+    participant DeadlineTimer
 
-    Agent->>AgentTimer: initialize()
-    AgentTimer-->>Agent: ready
-
-    loop Agent Run
-        Agent->>AgentTimer: process(input)
-        AgentTimer-->>Agent: result
-    end
-
-    Agent->>Output: deliver(result)
+    App->>+DeadlineExceededError: initialise()
+    DeadlineExceededError->>+DeadlineTimer: configure()
+    DeadlineTimer-->>-DeadlineExceededError: ready
+    App->>+DeadlineExceededError: run(context)
+    DeadlineExceededError->>+DeadlineTimer: execute(context)
+    DeadlineTimer-->>-DeadlineExceededError: result
+    DeadlineExceededError-->>-App: WorkflowResult
 ```
 
 ## Philosophy
 
-Abhimanyu knew how long he had in the chakravyuha. agent-timer gives your agents that same awareness.
+> Kāla — cosmic time — is the great timer; all actions arise and dissolve within its scheduled intervals.
 
 ---
 
-## Part of the Arsenal
-
-`agent-timer` is one of six production libraries for LLM agents:
-
-| Library | Purpose |
-|---------|---------|
-| [herald](https://github.com/darshjme/herald) | Semantic task routing |
-| [engram](https://github.com/darshjme/engram) | Agent memory |
-| [sentinel](https://github.com/darshjme/sentinel) | ReAct loop guards |
-| [verdict](https://github.com/darshjme/verdict) | Agent evaluation |
-| [agent-guardrails](https://github.com/darshjme/agent-guardrails) | Output validation |
-| [agent-observability](https://github.com/darshjme/agent-observability) | Tracing & metrics |
-
-→ [arsenal](https://github.com/darshjme/arsenal) — the complete stack
-
----
+*Part of the [arsenal](https://github.com/darshjme/arsenal) — production stack for LLM agents.*
 
 *Built by [Darshankumar Joshi](https://github.com/darshjme), Gujarat, India.*
