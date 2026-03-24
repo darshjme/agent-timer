@@ -1,248 +1,112 @@
+<div align="center">
+<img src="assets/hero.svg" width="100%"/>
+</div>
+
 # agent-timer
 
-**Execution timing and SLA enforcement for LLM agents.**
+**Execution timing and SLA enforcement for LLM agents. Zero external dependencies.**
 
-Zero external dependencies · Pure Python stdlib · `time.perf_counter` precision · Works with sync **and** async functions.
+[![PyPI](https://img.shields.io/pypi/v/agent-timer?color=blue)](https://pypi.org/project/agent-timer/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Zero deps](https://img.shields.io/badge/dependencies-zero-brightgreen)](pyproject.toml)
 
-```
+---
+
+## The Problem
+
+Production LLM agents fail silently. Without execution timing and sla enforcement, you get undefined behaviour at scale — race conditions, lost state, cascading failures, and no way to debug what went wrong.
+
+`agent-timer` gives you a production-ready execution timing and sla enforcement primitive with a clean API, tested edge cases, and zero configuration.
+
+## Installation
+
+```bash
 pip install agent-timer
 ```
 
----
+Or from source:
 
-## Why?
-
-LLM agent tasks have implicit time budgets:
-
-| Task                  | "Should take" | Silent failure |
-|-----------------------|---------------|----------------|
-| Tool call             | < 500 ms      | Hangs at 30 s  |
-| RAG retrieval         | < 200 ms      | Blocks pipeline |
-| Full agent loop       | < 5 s         | Exceeds SLA    |
-
-`agent-timer` makes those budgets explicit — with hard deadlines, SLA tracking, and p50/p95/p99 dashboards.
-
----
+```bash
+git clone https://github.com/darshjme/agent-timer.git
+cd agent-timer
+pip install -e .
+```
 
 ## Quick Start
 
 ```python
-from agent_timer import Timer, DeadlineTimer, SLATracker, timed, Profiler
+from agent_timer import *  # see API reference below
 
-# 1. Simple timer
-with Timer() as t:
-    result = call_llm(prompt)
-print(f"LLM call took {t.elapsed_ms:.1f} ms")
-
-# 2. Deadline enforcement
-with DeadlineTimer(5000) as d:       # 5-second budget
-    result = run_agent_loop()
-# Raises DeadlineExceededError if loop takes > 5 s
-
-# 3. Automatic timing decorator
-@timed(sla_ms=500)
-def fetch_context(query: str):
-    return vector_db.search(query)
-
-# 4. SLA dashboard
-tracker = SLATracker("llm-call", sla_ms=500)
-
-@timed(tracker=tracker, log=False)
-def llm_call(prompt):
-    return model.generate(prompt)
-
-# ... run 1000 times ...
-
-stats = tracker.stats()
-print(f"SLA compliance : {stats['compliance_pct']:.1f}%")
-print(f"p50  : {stats['p50_ms']:.1f} ms")
-print(f"p95  : {stats['p95_ms']:.1f} ms")
-print(f"p99  : {stats['p99_ms']:.1f} ms")
-print(f"Violations     : {stats['violations']} / {stats['count']}")
+# See examples/ directory for complete working examples
 ```
 
-**Example SLA dashboard output:**
+## API Reference
 
+The main classes and functions are defined in `agent_timer/__init__.py`.
+
+Key exports: `p50/p95/p99 · deadline timers · @timed · multi-step profiler`
+
+All classes follow a consistent interface:
+- Instantiate with sensible defaults
+- Compose with other arsenal libraries
+- Zero external dependencies required
+
+See the source code and `tests/` directory for verified usage examples.
+
+## How It Works
+
+```mermaid
+flowchart LR
+    A[Agent Task] --> B[agent-timer]
+    B --> C{Decision}
+    C -->|success| D[✅ Result]
+    C -->|failure| E[⚠️ Handle]
+    E --> B
+
+    style B fill:#161b22,stroke:#3fb950,stroke-width:2,color:#3fb950
+    style D fill:#1a3320,stroke:#238636,color:#3fb950
+    style E fill:#3d1a1a,stroke:#f85149,color:#f85149
 ```
-SLA compliance : 94.3%
-p50  : 218.4 ms
-p95  : 487.2 ms
-p99  : 612.8 ms
-Violations     : 57 / 1000
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant AgentTimer as agent-timer
+    participant Output
+
+    Agent->>AgentTimer: initialize()
+    AgentTimer-->>Agent: ready
+
+    loop Agent Run
+        Agent->>AgentTimer: process(input)
+        AgentTimer-->>Agent: result
+    end
+
+    Agent->>Output: deliver(result)
 ```
+
+## Philosophy
+
+Abhimanyu knew how long he had in the chakravyuha. agent-timer gives your agents that same awareness.
 
 ---
 
-## Components
+## Part of the Arsenal
 
-### `Timer`
+`agent-timer` is one of six production libraries for LLM agents:
 
-High-precision stopwatch using `time.perf_counter`.
+| Library | Purpose |
+|---------|---------|
+| [herald](https://github.com/darshjme/herald) | Semantic task routing |
+| [engram](https://github.com/darshjme/engram) | Agent memory |
+| [sentinel](https://github.com/darshjme/sentinel) | ReAct loop guards |
+| [verdict](https://github.com/darshjme/verdict) | Agent evaluation |
+| [agent-guardrails](https://github.com/darshjme/agent-guardrails) | Output validation |
+| [agent-observability](https://github.com/darshjme/agent-observability) | Tracing & metrics |
 
-```python
-from agent_timer import Timer
-
-# Manual control
-t = Timer()
-t.start()
-do_work()
-elapsed_ms = t.stop()
-
-# Context manager
-with Timer() as t:
-    do_work()
-print(t.elapsed_ms)      # ms
-print(t.elapsed_seconds) # seconds
-
-# Fluent
-t = Timer().start()
-```
-
-| Method/Property     | Description                               |
-|---------------------|-------------------------------------------|
-| `start() -> Timer`  | Start (returns self for chaining)         |
-| `stop() -> float`   | Stop and return elapsed_ms                |
-| `reset() -> Timer`  | Reset to zero                             |
-| `elapsed_ms`        | Current elapsed time in ms (live)         |
-| `elapsed_seconds`   | Convenience: elapsed_ms / 1000           |
-| `is_running`        | True while timer is active                |
+→ [arsenal](https://github.com/darshjme/arsenal) — the complete stack
 
 ---
 
-### `DeadlineTimer`
-
-Countdown timer with hard deadline enforcement.
-
-```python
-from agent_timer import DeadlineTimer, DeadlineExceededError
-
-d = DeadlineTimer(deadline_ms=2000)
-
-# Check remaining budget during work
-for chunk in data_stream:
-    process(chunk)
-    d.check()               # raises if over 2 s
-
-# Or use as a context manager
-try:
-    with DeadlineTimer(500):
-        result = slow_tool_call()
-except DeadlineExceededError as e:
-    print(f"Exceeded by {e.elapsed_ms - e.deadline_ms:.0f} ms")
-```
-
-| Method/Property    | Description                                    |
-|--------------------|------------------------------------------------|
-| `remaining_ms`     | Time left (negative if expired)                |
-| `is_expired`       | True if deadline passed                        |
-| `check()`          | Raises `DeadlineExceededError` if expired      |
-| `reset()`          | Restart countdown with same deadline           |
-
----
-
-### `SLATracker`
-
-Tracks compliance and computes percentile latencies over many calls.
-
-```python
-from agent_timer import SLATracker
-
-tracker = SLATracker("embedding", sla_ms=100)
-tracker.record(45.2)
-tracker.record(88.7)
-tracker.record(134.0)   # violation
-
-print(tracker.compliance_rate)   # 0.6667
-print(tracker.violations)        # 1
-print(tracker.p95_ms)            # 95th percentile
-print(tracker.stats())           # full dict
-```
-
----
-
-### `@timed` decorator
-
-Wraps sync and async functions with automatic timing.
-
-```python
-from agent_timer import timed, SLATracker
-
-tracker = SLATracker("retrieval", sla_ms=200)
-
-# Plain logging (JSON to stdout)
-@timed
-def retrieve(query):
-    return db.search(query)
-# → {"event": "timed", "function": "...", "elapsed_ms": 47.3}
-
-# SLA enforcement
-@timed(sla_ms=200)
-def fast_lookup(key):
-    return cache[key]
-# → raises SLAViolationError if > 200 ms
-
-# Record to tracker
-@timed(tracker=tracker, log=False)
-async def async_retrieve(query):
-    return await async_db.search(query)
-```
-
----
-
-### `Profiler`
-
-Multi-step pipeline profiler.
-
-```python
-from agent_timer import Profiler
-
-p = Profiler("rag-pipeline")
-
-with p.step("embed-query"):
-    embedding = embed(query)
-
-with p.step("vector-search"):
-    docs = index.search(embedding, k=5)
-
-with p.step("llm-generate"):
-    response = llm(build_prompt(docs, query))
-
-report = p.report()
-# {
-#   "profiler": "rag-pipeline",
-#   "total_ms": 312.4,
-#   "steps": {
-#     "embed-query":    {"elapsed_ms": 23.1,  "pct": 7.4,  "calls": 1},
-#     "vector-search":  {"elapsed_ms": 45.6,  "pct": 14.6, "calls": 1},
-#     "llm-generate":   {"elapsed_ms": 243.7, "pct": 78.0, "calls": 1},
-#   }
-# }
-```
-
----
-
-## Design
-
-- **Zero dependencies** — stdlib only (`time`, `asyncio`, `json`, `math`, `functools`)
-- **High precision** — `time.perf_counter` throughout (not `time.time`)
-- **No global state** — every component is an independent instance
-- **Thread-safe reads** — `elapsed_ms` property is safe to call from any thread
-- **Fast tests** — mock-time design; no sleeps > 10 ms
-
----
-
-## Development
-
-```bash
-git clone https://github.com/example/agent-timer
-cd agent-timer
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-python -m pytest tests/ -v
-```
-
----
-
-## License
-
-MIT
+*Built by [Darshankumar Joshi](https://github.com/darshjme), Gujarat, India.*
