@@ -1,18 +1,32 @@
 <div align="center">
-<img src="assets/hero.svg" width="100%"/>
+
+<img src="assets/agent-timer-hero.png" alt="agent-timer — Vedic Arsenal" width="100%" />
+
+# 🌊 agent-timer
+
+### *ब्रह्म* — Brahma — the universal intelligence
+
+**Execution timing and SLA enforcement for LLM agents — p50/p95/p99 tracking, deadline timers, @timed decorator, multi-step profiler. Zero dependencies.**
+
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=flat-square&logo=python)](https://python.org)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-brightgreen?style=flat-square)](https://github.com/darshjme/agent-timer)
+[![Tests](https://img.shields.io/badge/Tests-Passing-success?style=flat-square)](https://github.com/darshjme/agent-timer/actions)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![Vedic Arsenal](https://img.shields.io/badge/Vedic%20Arsenal-100%20libs-purple?style=flat-square)](https://github.com/darshjme/arsenal)
+
+*Part of the [**Vedic Arsenal**](https://github.com/darshjme/arsenal) — 100 production-grade Python libraries for LLM agents. Zero dependencies. Battle-tested.*
+
 </div>
-
-# agent-timer
-
-**Execution timing and SLA enforcement for LLM agents. Zero external dependencies.**
-
-[![PyPI version](https://img.shields.io/pypi/v/agent-timer?color=yellow&style=flat-square)](https://pypi.org/project/agent-timer/) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://python.org) [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square)](#)
 
 ---
 
-## The Problem
+## Overview
 
-Without a timer layer, delayed execution lives in `asyncio.sleep()` calls scattered through business logic — non-cancellable, drift-prone, and invisible to monitoring. Centralised timers are observable, cancellable, and correct.
+`agent-timer` implements **execution timing and sla enforcement for llm agents — p50/p95/p99 tracking, deadline timers, @timed decorator, multi-step profiler. zero dependencies.**
+
+Inspired by the Vedic principle of *ब्रह्म* (Brahma), this library brings the ancient wisdom of structured discipline to modern LLM agent engineering.
+
+No external dependencies. Pure Python 3.8+. Drop it in anywhere.
 
 ## Installation
 
@@ -20,100 +34,67 @@ Without a timer layer, delayed execution lives in `asyncio.sleep()` calls scatte
 pip install agent-timer
 ```
 
+Or clone directly:
+```bash
+git clone https://github.com/darshjme/agent-timer.git
+cd agent-timer
+pip install -e .
+```
+
 ## Quick Start
 
 ```python
-from agent_timer import DeadlineExceededError, DeadlineTimer, SLAViolationError
+from timer import *
 
-# Initialise
-instance = DeadlineExceededError(name="my_agent")
-
-# Use
-result = instance.run()
-print(result)
+# Initialize
+# See examples/ for full usage patterns
 ```
 
-## API Reference
+## Why `agent-timer`?
 
-### `DeadlineExceededError`
+Production LLM systems fail in predictable ways. `agent-timer` solves the **timer** failure mode with:
 
-```python
-class DeadlineExceededError(Exception):
-    """Raised when a deadline has been exceeded."""
-    def __init__(self, deadline_ms: float, elapsed_ms: float) -> None:
+- **Zero dependencies** — no version conflicts, no bloat
+- **Battle-tested patterns** — extracted from real production systems
+- **Type-safe** — full type hints, mypy-compatible
+- **Minimal surface area** — one job, done well
+- **Composable** — works with any LLM framework (LangChain, LlamaIndex, raw OpenAI, etc.)
+
+## The Vedic Arsenal
+
+`agent-timer` is part of **[darshjme/arsenal](https://github.com/darshjme/arsenal)** — a collection of 100 focused Python libraries for LLM agent infrastructure.
+
+Each library solves exactly one problem. Together they form a complete stack.
+
+```
+pip install agent-timer  # this library
+# Browse all 100: https://github.com/darshjme/arsenal
 ```
 
-### `DeadlineTimer`
+## Contributing
 
-```python
-class DeadlineTimer:
-    """
-    def __init__(self, deadline_ms: float) -> None:
-    def elapsed_ms(self) -> float:
-        """Milliseconds elapsed since creation."""
-    def remaining_ms(self) -> float:
-        """Milliseconds remaining before deadline (may be negative if expired)."""
-    def is_expired(self) -> bool:
-        """True if the deadline has been exceeded."""
-```
+Found a bug? Have an improvement?
 
-### `SLAViolationError`
+1. Fork the repo
+2. Create a feature branch (`git checkout -b fix/your-fix`)
+3. Add tests
+4. Open a PR
 
-```python
-class SLAViolationError(Exception):
-    """Import from sla module — re-exported here for convenience."""
-def _get_sla_violation_error():
-def _log_json(func_name: str, elapsed_ms: float, extra: dict | None = None) -> None:
-def _make_wrapper(
-def _handle_result(
-```
+All contributions welcome. Keep it zero-dependency.
 
-### `StepNotStartedError`
+## License
 
-```python
-class StepNotStartedError(Exception):
-    """Raised when end_step is called for a step that was never started."""
-```
-
-
-## How It Works
-
-### Flow
-
-```mermaid
-flowchart LR
-    A[User Code] -->|create| B[DeadlineExceededError]
-    B -->|configure| C[DeadlineTimer]
-    C -->|execute| D{Success?}
-    D -->|yes| E[Return Result]
-    D -->|no| F[Error Handler]
-    F --> G[Fallback / Retry]
-    G --> C
-```
-
-### Sequence
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant DeadlineExceededError
-    participant DeadlineTimer
-
-    App->>+DeadlineExceededError: initialise()
-    DeadlineExceededError->>+DeadlineTimer: configure()
-    DeadlineTimer-->>-DeadlineExceededError: ready
-    App->>+DeadlineExceededError: run(context)
-    DeadlineExceededError->>+DeadlineTimer: execute(context)
-    DeadlineTimer-->>-DeadlineExceededError: result
-    DeadlineExceededError-->>-App: WorkflowResult
-```
-
-## Philosophy
-
-> Kāla — cosmic time — is the great timer; all actions arise and dissolve within its scheduled intervals.
+MIT — use freely, build freely.
 
 ---
 
-*Part of the [arsenal](https://github.com/darshjme/arsenal) — production stack for LLM agents.*
+<div align="center">
 
-*Built by [Darshankumar Joshi](https://github.com/darshjme), Gujarat, India.*
+**Built with 🌊 by [Darshankumar Joshi](https://github.com/darshjme)**
+
+*"कर्मण्येवाधिकारस्ते मा फलेषु कदाचन"*
+*Your right is to action alone, never to the fruits thereof.*
+
+[Arsenal](https://github.com/darshjme/arsenal) · [GitHub](https://github.com/darshjme) · [Twitter](https://twitter.com/thedarshanjoshi)
+
+</div>
